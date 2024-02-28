@@ -38,4 +38,8 @@ class LinkCore extends PluginBase{
 
         $this->connection->writeOutBuffer($serializer->getBuffer());
     }
+
+    protected function onDisable() : void{
+        $this->connection->close(true);
+    }
 }

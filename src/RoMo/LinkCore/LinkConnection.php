@@ -13,6 +13,7 @@ class LinkConnection extends Thread{
 
     const STATE_CONNECTED = 0;
     const STATE_DISCONNECTED = 1;
+    const STATE_SHUTDOWN = 2;
 
     /** @var int */
     private int $state = self::STATE_DISCONNECTED;
@@ -51,6 +52,9 @@ class LinkConnection extends Thread{
     }
 
     private function tryConnect() : void{
+        if($this->state === self::STATE_SHUTDOWN){
+            return;
+        }
         $this->logger->notice("trying to connect to link...");
         $this->logger->notice("ip: {$this->address}");
         $this->logger->notice("port: {$this->port}");
@@ -68,10 +72,11 @@ class LinkConnection extends Thread{
                 socket_set_option($socket, SOL_TCP, TCP_NODELAY, 1);
 
                 $this->socket = $socket;
-                $this->communicate();
             }catch(\Throwable $e){
                 continue;
             }
+
+            $this->communicate();
         }
     }
 
@@ -79,7 +84,8 @@ class LinkConnection extends Thread{
         $this->changeState(self::STATE_CONNECTED);
         $socket = $this->socket;
 
-        while(true){
+        sleep(2);
+        while($this->state === self::STATE_CONNECTED){
             $error = socket_last_error();
             socket_clear_error($socket);
 
@@ -90,7 +96,7 @@ class LinkConnection extends Thread{
             //READ
             $buffer = @socket_read($socket, 65536);
             if($buffer !== ""){
-                //TODO: READ
+                $this->input[] = $buffer;
             }
             //WRITE
             while(!is_null(($buffer = $this->output->shift())) && $buffer !== ""){
@@ -99,15 +105,16 @@ class LinkConnection extends Thread{
                 }
             }
         }
+
+        $this->tryConnect();
     }
 
-    private function close() : void{
+    public function close(bool $isShutdown = false) : void{
         if(!is_null($this->socket)){
             socket_close($this->socket);
         }
-        $this->changeState(self::STATE_DISCONNECTED);
+        $this->changeState($isShutdown ? self::STATE_SHUTDOWN : self::STATE_DISCONNECTED);
         $this->logger->notice("link has disconnected");
-        $this->tryConnect();
     }
 
     /**
