@@ -6,8 +6,10 @@ namespace RoMo\LinkCore;
 
 use pocketmine\plugin\PluginBase;
 use pocketmine\Server;
+use RoMo\LinkCore\linkServer\LinkServer;
 use RoMo\LinkCore\protocol\LinkPacket;
 use RoMo\LinkCore\protocol\LinkPacketSerializer;
+use pocketmine\utils\Binary;
 
 class LinkCore extends PluginBase{
 
@@ -21,22 +23,21 @@ class LinkCore extends PluginBase{
             $config->get("port"));
     }
 
-    public function sendPacket(LinkPacket $packet) : void{
+    public function sendPacket(LinkPacket $packet, ?LinkServer $linkServer = null) : void{
         $serializer = new LinkPacketSerializer();
-
-        //IS DEFAULT PACKET
-        $serializer->putBool($packet->isDefaultPacket());
-
-        //TARGET SERVER
-        //TODO: GET TARGET SERVER NAME
-        $serializer->putString("");
 
         //PACKET ID
         $serializer->putByte($packet->getPacketId());
 
+        //TARGET SERVER
+        $serializer->putString(is_null($linkServer) ? "" : $linkServer->getName());
+
         $packet->encodePayload($serializer);
 
-        $this->connection->writeOutBuffer($serializer->getBuffer());
+        $return = Binary::writeInt(strlen($serializer->getBuffer()));
+        $return .= $serializer->getBuffer();
+
+        $this->connection->writeOutBuffer($return);
     }
 
     protected function onDisable() : void{
