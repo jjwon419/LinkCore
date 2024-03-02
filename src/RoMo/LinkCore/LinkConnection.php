@@ -7,6 +7,7 @@ namespace RoMo\LinkCore;
 use pocketmine\thread\log\ThreadSafeLogger;
 use pocketmine\thread\Thread;
 use pmmp\thread\ThreadSafeArray;
+use pocketmine\utils\Binary;
 use Socket;
 
 class LinkConnection extends Thread{
@@ -36,6 +37,9 @@ class LinkConnection extends Thread{
     private ThreadSafeArray $input;
     private ThreadSafeArray $output;
 
+    /** @var string */
+    private string $buffer = "";
+
     public function __construct(ThreadSafeLogger $logger, string $address, int $port){
         $this->logger = $logger;
         $this->address = $address;
@@ -43,6 +47,8 @@ class LinkConnection extends Thread{
 
         $this->input = new ThreadSafeArray();
         $this->output = new ThreadSafeArray();
+
+
 
         $this->start();
     }
@@ -84,7 +90,6 @@ class LinkConnection extends Thread{
         $this->changeState(self::STATE_CONNECTED);
         $socket = $this->socket;
 
-        sleep(2);
         while($this->state === self::STATE_CONNECTED){
             $error = socket_last_error();
             socket_clear_error($socket);
@@ -96,17 +101,51 @@ class LinkConnection extends Thread{
             //READ
             $buffer = @socket_read($socket, 65536);
             if($buffer !== ""){
-                $this->input[] = $buffer;
+                $this->buffer .= $buffer;
             }
+
             //WRITE
             while(!is_null(($buffer = $this->output->shift())) && $buffer !== ""){
                 if(@socket_write($socket, $buffer) === false){
                     $this->close();
                 }
             }
+
+            $this->readBuffer();
         }
 
         $this->tryConnect();
+    }
+
+    private function readBuffer() : void{
+        if(empty($this->buffer)){
+            return;
+        }
+
+        $offset = 0;
+        $bufferLength = strlen($this->buffer);
+        while($offset < $bufferLength){
+            if($offset > ($bufferLength - 4)){
+                break;
+            }
+
+            $length = Binary::readInt(substr($this->buffer, $offset, 4));
+            $offset += 4;
+
+            if(($offset + $length) > $bufferLength){
+                break;
+            }
+
+            $payload = substr($this->buffer, $offset, $length);
+            $offset += $length;
+            $this->input[] = $payload;
+        }
+
+        if($offset < $bufferLength){
+            $this->buffer = substr($this->buffer, $offset);
+        }else{
+            $this->buffer = "";
+        }
     }
 
     public function close(bool $isShutdown = false) : void{
@@ -136,5 +175,7 @@ class LinkConnection extends Thread{
         return "link-connection";
     }
 
-
+    public function inBufferShift() : ?string{
+        return $this->input->shift();
+    }
 }
