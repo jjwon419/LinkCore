@@ -8,7 +8,6 @@ use pocketmine\plugin\PluginBase;
 use pocketmine\Server;
 use pocketmine\utils\SingletonTrait;
 use RoMo\LinkCore\linkServer\LinkServer;
-use RoMo\LinkCore\protocol\default\HandShakePacket;
 use RoMo\LinkCore\protocol\LinkPacket;
 use RoMo\LinkCore\protocol\LinkPacketSerializer;
 use pocketmine\utils\Binary;
@@ -17,9 +16,11 @@ class LinkCore extends PluginBase{
 
     use SingletonTrait;
 
-    const PROTOCOL_VERSION = 0;
+    const PROTOCOL_VERSION = 1;
 
     private LinkConnection $connection;
+
+    private string $serverName;
 
     protected function onLoad() : void{
         self::$instance = $this;
@@ -31,8 +32,7 @@ class LinkCore extends PluginBase{
         $this->connection = new LinkConnection(Server::getInstance()->getLogger(),
             $config->get("ip"),
             $config->get("port"));
-
-        $this->sendPacket(new HandShakePacket());
+        $this->serverName = $config->get("server-name");
 
         $this->getScheduler()->scheduleRepeatingTask(new BufferReadTask($this->connection), 5);
     }
@@ -74,5 +74,12 @@ class LinkCore extends PluginBase{
 
     public function getPassword() : string{
         return (string) $this->getConfig()->get("password");
+    }
+
+    /**
+     * @return string
+     */
+    public function getServerName() : string{
+        return $this->serverName;
     }
 }

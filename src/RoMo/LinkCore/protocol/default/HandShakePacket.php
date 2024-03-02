@@ -20,6 +20,7 @@ class HandShakePacket extends LinkPacket{
         $binaryStream->putString(LinkCore::getInstance()->getPassword());
         $binaryStream->putString(Server::getInstance()->getIp());
         $binaryStream->putInt(Server::getInstance()->getPort());
+        $binaryStream->putString(LinkCore::getInstance()->getServerName());
     }
     public function decodePayload(LinkPacketSerializer $binaryStream) : void{
         //NOTHING: THIS PACKET IS NOT OUT BOUND.

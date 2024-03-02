@@ -8,13 +8,14 @@ use pocketmine\thread\log\ThreadSafeLogger;
 use pocketmine\thread\Thread;
 use pmmp\thread\ThreadSafeArray;
 use pocketmine\utils\Binary;
+use RoMo\LinkCore\protocol\default\HandShakePacket;
 use Socket;
 
 class LinkConnection extends Thread{
 
     const STATE_CONNECTED = 0;
     const STATE_DISCONNECTED = 1;
-    const STATE_SHUTDOWN = 2;
+    const STATE_HAND_SHAKE = 2;
 
     /** @var int */
     private int $state = self::STATE_DISCONNECTED;
@@ -40,6 +41,8 @@ class LinkConnection extends Thread{
     /** @var string */
     private string $buffer = "";
 
+    private bool $isShutdown = false;
+
     public function __construct(ThreadSafeLogger $logger, string $address, int $port){
         $this->logger = $logger;
         $this->address = $address;
@@ -47,8 +50,6 @@ class LinkConnection extends Thread{
 
         $this->input = new ThreadSafeArray();
         $this->output = new ThreadSafeArray();
-
-
 
         $this->start();
     }
@@ -58,7 +59,7 @@ class LinkConnection extends Thread{
     }
 
     private function tryConnect() : void{
-        if($this->state === self::STATE_SHUTDOWN){
+        if($this->isShutdown){
             return;
         }
         $this->logger->notice("trying to connect to link...");
@@ -78,19 +79,20 @@ class LinkConnection extends Thread{
                 socket_set_option($socket, SOL_TCP, TCP_NODELAY, 1);
 
                 $this->socket = $socket;
+                break;
             }catch(\Throwable $e){
                 continue;
             }
-
-            $this->communicate();
         }
+
+        $this->communicate();
     }
 
     private function communicate() : void{
         $this->changeState(self::STATE_CONNECTED);
         $socket = $this->socket;
 
-        while($this->state === self::STATE_CONNECTED){
+        while($this->state != self::STATE_DISCONNECTED){
             $error = socket_last_error();
             socket_clear_error($socket);
 
@@ -152,7 +154,8 @@ class LinkConnection extends Thread{
         if(!is_null($this->socket)){
             socket_close($this->socket);
         }
-        $this->changeState($isShutdown ? self::STATE_SHUTDOWN : self::STATE_DISCONNECTED);
+        $this->isShutdown = $isShutdown;
+        $this->changeState( self::STATE_DISCONNECTED);
         $this->logger->notice("link has disconnected");
     }
 

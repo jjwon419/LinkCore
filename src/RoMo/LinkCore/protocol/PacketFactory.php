@@ -6,6 +6,7 @@ namespace RoMo\LinkCore\protocol;
 
 use pocketmine\utils\SingletonTrait;
 use RoMo\LinkCore\protocol\default\HandShakePacket;
+use RoMo\LinkCore\protocol\default\HandShakeResultPacket;
 use RoMo\LinkCore\protocol\exception\AlreadyExistPacketException;
 
 class PacketFactory{
@@ -21,6 +22,7 @@ class PacketFactory{
 
     private function __construct(){
         $this->register(new HandShakePacket());
+        $this->register(new HandShakeResultPacket());
     }
 
     /**
